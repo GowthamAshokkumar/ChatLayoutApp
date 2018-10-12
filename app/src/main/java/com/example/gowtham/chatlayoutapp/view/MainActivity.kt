@@ -6,13 +6,18 @@ import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.support.v7.widget.LinearLayoutManager
 import android.view.View
+import android.widget.Toast
 import com.example.gowtham.chatlayoutapp.R
+import com.example.gowtham.chatlayoutapp.db.AppDatabase
 import com.example.gowtham.chatlayoutapp.viewModel.MainActivityViewModel
+import com.example.gowtham.chatlayoutapp.viewModel.MyViewModelProviderFactory
 import com.jakewharton.rxbinding2.view.RxView
 import dagger.android.AndroidInjection
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
+import javax.inject.Inject
+import javax.inject.Named
 
 
 class MainActivity : AppCompatActivity() {
@@ -21,16 +26,21 @@ class MainActivity : AppCompatActivity() {
     private lateinit var recyclerViewAdapter: RecyclerViewAdapter
     private val compositeDisposable = CompositeDisposable()
 
+    @field:[Inject Named("message_database")]
+    lateinit var appDatabase: AppDatabase
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
         AndroidInjection.inject(this)
         setUpViews()
+
+
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         compositeDisposable.clear()
+        super.onDestroy()
     }
 
 
@@ -38,6 +48,7 @@ class MainActivity : AppCompatActivity() {
         recyclerViewAdapter = RecyclerViewAdapter()
         val linearLayoutManager = LinearLayoutManager(applicationContext)
         messageRecyclerView.layoutManager = linearLayoutManager
+        //linearLayoutManager.stackFromEnd=true
         messageRecyclerView.adapter = recyclerViewAdapter
 
         messageRecyclerView.addOnLayoutChangeListener { _: View, left: Int, top: Int, right: Int, bottom: Int, oldLeft: Int, oldRight: Int, oldTop: Int, oldBottom: Int ->
@@ -59,13 +70,19 @@ class MainActivity : AppCompatActivity() {
                 }
         compositeDisposable.addAll(d1, d2)
 
-        mainActivityViewModel = ViewModelProviders.of(this).get(MainActivityViewModel::class.java)
-        mainActivityViewModel.messagesLiveData.observe(this, Observer {
-            if (it != null) {
-                recyclerViewAdapter.setMessages(it)
-                messageEditText.setText("")
-                messageRecyclerView.scrollToPosition(recyclerViewAdapter.itemCount - 1)
-            }
+        mainActivityViewModel = ViewModelProviders.of(this,MyViewModelProviderFactory(appDatabase)).get(MainActivityViewModel::class.java)
+
+        mainActivityViewModel.pagedListLiveData.observe(this, Observer {
+            recyclerViewAdapter.submitList(it)
+            messageEditText.setText("")
+            messageRecyclerView.scrollToPosition(recyclerViewAdapter.currentList?.size!! -1 )
+            Toast.makeText(applicationContext,"total items "+recyclerViewAdapter.itemCount,Toast.LENGTH_SHORT).show()
         })
+
+
+
+
     }
+
 }
+
