@@ -10,21 +10,25 @@ import com.example.gowtham.chatlayoutapp.model.MyMessage
 import io.reactivex.BackpressureStrategy
 import io.reactivex.Completable
 import io.reactivex.Flowable
-import io.reactivex.Observable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
+import android.provider.MediaStore
+import android.provider.MediaStore.MediaColumns
+import android.app.Application
+import android.database.Cursor
+import android.net.Uri
+import io.reactivex.Observable
+import io.reactivex.android.schedulers.AndroidSchedulers
 
 
-class MainActivityViewModel(val db: AppDatabase) :ViewModel(){
+class MainActivityViewModel(val application: Application,val db: AppDatabase) :ViewModel(){
 
-    val messagesLiveData:MutableLiveData<List<MyMessage>> = MutableLiveData()
     val pagedListLiveData:MutableLiveData<PagedList<MyMessage>> = MutableLiveData()
+    val attachImagesLiveData:MutableLiveData<ArrayList<String>> = MutableLiveData()
     private val compositeDisposable=CompositeDisposable()
 
+
     init {
-        val d=db.messageDao().getAll().subscribe {
-            messagesLiveData.postValue(it)
-        }
 
         val concertList: Flowable<PagedList<MyMessage>> =
                 RxPagedListBuilder(db.messageDao().getAllMessages(), /* page size */ 50)
@@ -33,7 +37,9 @@ class MainActivityViewModel(val db: AppDatabase) :ViewModel(){
         val d1=concertList.subscribe {
             pagedListLiveData.postValue(it)
         }
-        compositeDisposable.addAll(d,d1)
+        compositeDisposable.add(d1)
+
+
     }
 
     fun insertMessage(message:String,isSender:Boolean){
@@ -45,9 +51,52 @@ class MainActivityViewModel(val db: AppDatabase) :ViewModel(){
 
     }
 
+    fun getAttachImages(){
+        val d= Observable
+                .fromArray(getAllShownImagesPath(application))
+                .subscribeOn(Schedulers.io())
+                .observeOn(AndroidSchedulers.mainThread())
+                .subscribe{
+                   attachImagesLiveData.value=it
+                }
+    }
+
+
+
     override fun onCleared() {
         super.onCleared()
         compositeDisposable.clear()
+    }
+
+
+    /**
+     * Getting All Images Path.
+     *
+     * @param activity
+     * the activity
+     * @return ArrayList with images Path
+     */
+    private fun getAllShownImagesPath(application: Application): ArrayList<String> {
+        val uri: Uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
+        val cursor: Cursor
+        val column_index_data: Int
+        //val column_index_folder_name: Int
+        val listOfAllImages = arrayListOf<String>()
+        var absolutePathOfImage: String? = null
+
+        val projection = arrayOf(MediaColumns.DATA, MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+
+        cursor = application.contentResolver.query(uri, projection, null, null, null)
+
+        column_index_data = cursor.getColumnIndexOrThrow(MediaColumns.DATA)
+        //column_index_folder_name = cursor
+        //        .getColumnIndexOrThrow(MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
+        while (cursor.moveToNext()) {
+            absolutePathOfImage = cursor.getString(column_index_data)
+
+            listOfAllImages.add(absolutePathOfImage)
+        }
+        return listOfAllImages
     }
 
 }

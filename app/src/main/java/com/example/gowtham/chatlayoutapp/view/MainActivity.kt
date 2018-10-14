@@ -1,12 +1,15 @@
 package com.example.gowtham.chatlayoutapp.view
 
+import android.Manifest
 import android.arch.lifecycle.Observer
 import android.arch.lifecycle.ViewModelProviders
+import android.arch.persistence.room.RxRoom
+import android.graphics.Rect
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
+import android.support.v7.widget.GridLayoutManager
 import android.support.v7.widget.LinearLayoutManager
 import android.view.View
-import android.widget.Toast
 import com.example.gowtham.chatlayoutapp.R
 import com.example.gowtham.chatlayoutapp.db.AppDatabase
 import com.example.gowtham.chatlayoutapp.viewModel.MainActivityViewModel
@@ -18,12 +21,16 @@ import io.reactivex.schedulers.Schedulers
 import kotlinx.android.synthetic.main.activity_main.*
 import javax.inject.Inject
 import javax.inject.Named
+import android.support.v7.widget.RecyclerView
+import android.widget.Toast
+import com.tbruyelle.rxpermissions2.RxPermissions
 
 
 class MainActivity : AppCompatActivity() {
 
     private lateinit var mainActivityViewModel: MainActivityViewModel
     private lateinit var recyclerViewAdapter: RecyclerViewAdapter
+    private lateinit var attachRecyclerViewAdapter: AttachRecyclerViewAdapter
     private val compositeDisposable = CompositeDisposable()
 
     @field:[Inject Named("message_database")]
@@ -46,6 +53,7 @@ class MainActivity : AppCompatActivity() {
 
     private fun setUpViews() {
         recyclerViewAdapter = RecyclerViewAdapter()
+        attachRecyclerViewAdapter=AttachRecyclerViewAdapter()
         val linearLayoutManager = LinearLayoutManager(applicationContext)
         messageRecyclerView.layoutManager = linearLayoutManager
         //linearLayoutManager.stackFromEnd=true
@@ -68,21 +76,58 @@ class MainActivity : AppCompatActivity() {
                 .subscribe {
                     mainActivityViewModel.insertMessage(messageEditText.text.toString(), false)
                 }
-        compositeDisposable.addAll(d1, d2)
 
-        mainActivityViewModel = ViewModelProviders.of(this,MyViewModelProviderFactory(appDatabase)).get(MainActivityViewModel::class.java)
+
+        mainActivityViewModel = ViewModelProviders.of(this,MyViewModelProviderFactory(application,appDatabase)).get(MainActivityViewModel::class.java)
 
         mainActivityViewModel.pagedListLiveData.observe(this, Observer {
             recyclerViewAdapter.submitList(it)
             messageEditText.setText("")
             messageRecyclerView.scrollToPosition(recyclerViewAdapter.currentList?.size!! -1 )
-            Toast.makeText(applicationContext,"total items "+recyclerViewAdapter.itemCount,Toast.LENGTH_SHORT).show()
         })
 
+        mainActivityViewModel.attachImagesLiveData.observe(this, Observer {
+            if (it != null) {
+                attachRecyclerViewAdapter.update(it)
+            }
+        })
 
+        imageRecyclerView.visibility=View.GONE
 
+        val d3=RxView.clicks(attachImageButton).subscribe{
+            if(imageRecyclerView.visibility == View.GONE){
+                RxPermissions(this@MainActivity)
+                        .request(Manifest.permission.READ_EXTERNAL_STORAGE)
+                        .subscribe {status->
+                            if(status){
+                                imageRecyclerView.visibility=View.VISIBLE
+                                val layoutManager = GridLayoutManager(applicationContext,3)
+                                imageRecyclerView.layoutManager=layoutManager
+                                imageRecyclerView.adapter=attachRecyclerViewAdapter
+                                imageRecyclerView.addItemDecoration(ItemOffsetDecoration(1))
+                                mainActivityViewModel.getAttachImages()
+                            }else{
+                                Toast.makeText(applicationContext,"permission denied",Toast.LENGTH_SHORT).show()
+                            }
+                        }
+
+            }else{
+                imageRecyclerView.visibility=View.GONE
+            }
+        }
+
+        compositeDisposable.addAll(d1,d2,d3)
 
     }
 
+}
+
+class ItemOffsetDecoration(private val mItemOffset: Int) : RecyclerView.ItemDecoration() {
+
+    override fun getItemOffsets(outRect: Rect, view: View, parent: RecyclerView,
+                       state: RecyclerView.State) {
+        super.getItemOffsets(outRect, view, parent, state)
+        outRect.set(mItemOffset, mItemOffset, mItemOffset, mItemOffset)
+    }
 }
 
