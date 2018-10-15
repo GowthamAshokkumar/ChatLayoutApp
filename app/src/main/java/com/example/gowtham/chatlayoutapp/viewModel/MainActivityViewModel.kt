@@ -7,6 +7,7 @@ import android.arch.lifecycle.LiveData
 import android.arch.lifecycle.MutableLiveData
 import android.arch.lifecycle.ViewModel
 import android.arch.paging.*
+import android.database.Cursor
 import android.net.Uri
 import android.provider.MediaStore
 import android.provider.MediaStore.MediaColumns
@@ -17,6 +18,7 @@ import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
+import javax.inject.Inject
 
 
 class MainActivityViewModel(val application: Application,val db: AppDatabase) :ViewModel(){
@@ -25,9 +27,7 @@ class MainActivityViewModel(val application: Application,val db: AppDatabase) :V
     lateinit var attachImagesLiveData: LiveData<PagedList<String>>
     private val compositeDisposable=CompositeDisposable()
 
-
     init {
-
         val concertList: Flowable<PagedList<MyMessage>> =
                 RxPagedListBuilder(db.messageDao().getAllMessages(), /* page size */ 25)
                         .buildFlowable(BackpressureStrategy.LATEST)
@@ -36,8 +36,6 @@ class MainActivityViewModel(val application: Application,val db: AppDatabase) :V
             pagedListLiveData.postValue(it)
         }
         compositeDisposable.add(d1)
-
-
     }
 
     fun insertMessage(message:String,isSender:Boolean){
@@ -58,8 +56,6 @@ class MainActivityViewModel(val application: Application,val db: AppDatabase) :V
                 FilesDataSourceFactory(application), config).build()
     }
 
-
-
     override fun onCleared() {
         super.onCleared()
         compositeDisposable.clear()
@@ -77,7 +73,7 @@ class FilesDataSourceFactory(private val application: Application) :
 }
 
 
-class FilesDataSource(val application: Application) : PositionalDataSource<String>() {
+class FilesDataSource(@Inject val application: Application) : PositionalDataSource<String>() {
 
     override fun loadRange(params: LoadRangeParams, callback: LoadRangeCallback<String>) {
         callback.onResult(getFiles(params.loadSize, params.startPosition))
@@ -90,18 +86,24 @@ class FilesDataSource(val application: Application) : PositionalDataSource<Strin
     @SuppressLint("Recycle")
     private fun getFiles(limit: Int, offset: Int): MutableList<String> {
         val uri: Uri = android.provider.MediaStore.Images.Media.EXTERNAL_CONTENT_URI
-        val listOfAllImages = mutableListOf<String>()
-        var absolutePathOfImage: String?
         val projection = arrayOf(MediaColumns.DATA, MediaStore.Images.Media.BUCKET_DISPLAY_NAME)
         val orderBy = MediaStore.Images.Media.DATE_TAKEN
         val cursor = application.contentResolver.query(uri, projection, null, null
                 , "$orderBy DESC LIMIT $limit OFFSET $offset")!!
         val columnIndex = cursor.getColumnIndexOrThrow(MediaColumns.DATA)
-        while (cursor.moveToNext()) {
-            absolutePathOfImage = cursor.getString(columnIndex)
-            listOfAllImages.add(absolutePathOfImage)
+        return cursor.mapToList {
+            it.getString(columnIndex)
         }
-        cursor.close()
-        return listOfAllImages
     }
+
+}
+
+fun <T> Cursor.mapToList(callback: (Cursor) -> T): MutableList<T> {
+    val list = mutableListOf<T>()
+    moveToFirst()
+    while (moveToNext()) {
+        list.add(callback(this))
+    }
+    close()
+    return list
 }
