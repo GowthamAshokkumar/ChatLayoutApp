@@ -18,7 +18,6 @@ import io.reactivex.Completable
 import io.reactivex.Flowable
 import io.reactivex.disposables.CompositeDisposable
 import io.reactivex.schedulers.Schedulers
-import javax.inject.Inject
 
 
 class MainActivityViewModel(val application: Application,val db: AppDatabase) :ViewModel(){
@@ -29,7 +28,7 @@ class MainActivityViewModel(val application: Application,val db: AppDatabase) :V
 
     init {
         val concertList: Flowable<PagedList<MyMessage>> =
-                RxPagedListBuilder(db.messageDao().getAllMessages(), /* page size */ 25)
+                RxPagedListBuilder(db.messageDao().getAllMessages(), /* page size */ 50)
                         .buildFlowable(BackpressureStrategy.LATEST)
 
         val d1=concertList.subscribe {
@@ -73,7 +72,7 @@ class FilesDataSourceFactory(private val application: Application) :
 }
 
 
-class FilesDataSource(@Inject val application: Application) : PositionalDataSource<String>() {
+class FilesDataSource(val application: Application) : PositionalDataSource<String>() {
 
     override fun loadRange(params: LoadRangeParams, callback: LoadRangeCallback<String>) {
         callback.onResult(getFiles(params.loadSize, params.startPosition))

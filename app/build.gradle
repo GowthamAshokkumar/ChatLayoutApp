@@ -61,5 +61,5 @@ dependencies {
     // optional - RxJava support, currently in release candidate
     implementation 'android.arch.paging:rxjava2:1.0.1'
     implementation group: 'com.tbruyelle.rxpermissions2', name: 'rxpermissions', version: '0.9.5'
-
+    implementation group: 'com.hannesdorfmann', name: 'adapterdelegates3', version: '3.0.0'
 }

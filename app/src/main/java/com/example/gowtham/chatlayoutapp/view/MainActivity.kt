@@ -28,7 +28,7 @@ import javax.inject.Named
 class MainActivity : AppCompatActivity() {
 
     private lateinit var mainActivityViewModel: MainActivityViewModel
-    private lateinit var recyclerViewAdapter: RecyclerViewAdapter
+    private lateinit var recyclerViewAdapter: FullPageAdapter
     private lateinit var attachRecyclerViewAdapter: AttachRecyclerViewAdapter
     private val compositeDisposable = CompositeDisposable()
 
@@ -51,7 +51,7 @@ class MainActivity : AppCompatActivity() {
 
 
     private fun setUpViews() {
-        recyclerViewAdapter = RecyclerViewAdapter()
+        recyclerViewAdapter = FullPageAdapter()
         attachRecyclerViewAdapter=AttachRecyclerViewAdapter()
         val linearLayoutManager = LinearLayoutManager(applicationContext)
         messageRecyclerView.layoutManager = linearLayoutManager
@@ -80,9 +80,11 @@ class MainActivity : AppCompatActivity() {
         mainActivityViewModel = ViewModelProviders.of(this,MyViewModelProviderFactory(application,appDatabase)).get(MainActivityViewModel::class.java)
 
         mainActivityViewModel.pagedListLiveData.observe(this, Observer {
-            recyclerViewAdapter.submitList(it)
-            messageEditText.setText("")
-            messageRecyclerView.scrollToPosition(recyclerViewAdapter.currentList?.size!! -1 )
+            if (it != null && it.size > 0) {
+                recyclerViewAdapter.submitList(it)
+                messageEditText.setText("")
+                messageRecyclerView.scrollToPosition(recyclerViewAdapter.currentList?.size!! - 1)
+            }
         })
 
 
@@ -114,6 +116,7 @@ class MainActivity : AppCompatActivity() {
         }
 
         compositeDisposable.addAll(d1,d2,d3)
+
 
     }
 
